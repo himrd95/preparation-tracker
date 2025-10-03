@@ -444,10 +444,11 @@ async function main() {
 
   const questionIds = []
   for (const question of dsaQuestions) {
-    const result = await prisma.questionBank.upsert({
-      where: { title: question.title },
-      update: {},
-      create: question,
+    const result = await prisma.question.create({
+      data: {
+        ...question,
+        userId: demoUser.id,
+      },
     })
     questionIds.push(result.id)
   }
