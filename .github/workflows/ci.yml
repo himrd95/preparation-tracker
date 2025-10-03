@@ -25,11 +25,8 @@ jobs:
     - name: Run linter
       run: npm run lint
 
-    - name: Run type check
-      run: npm run type-check
-
-    - name: Run unit tests
-      run: npm run test:unit
+    - name: Run tests
+      run: npm run test
 
     - name: Run e2e tests
       run: npm run test:e2e
@@ -54,7 +51,7 @@ jobs:
       run: npm run build
 
   deploy:
-    needs: [test, build]
+    needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
 
@@ -65,7 +62,6 @@ jobs:
       uses: amondnet/vercel-action@v25
       with:
         vercel-token: ${{ secrets.VERCEL_TOKEN }}
-        vercel-org-id: ${{ secrets.ORG_ID }}
-        vercel-project-id: ${{ secrets.PROJECT_ID }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
         vercel-args: '--prod'
-

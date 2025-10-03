@@ -1,153 +1,87 @@
-"use client"
+'use client'
 
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts"
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
+import { Card } from '@/components/ui/styled'
 
-const COLORS = {
-  dsa: "#3B82F6",
-  frontend: "#10B981", 
-  systemDesign: "#F59E0B"
-}
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8']
 
 interface ProgressChartProps {
-  data: {
-    category: string
-    completed: number
-    total: number
-    percentage: number
-  }[]
+  data: Array<{
+    name: string
+    value: number
+    color?: string
+  }>
+  type?: 'pie' | 'bar'
+  title?: string
 }
 
-export function ProgressChart({ data }: ProgressChartProps) {
-  const pieData = data.map(item => ({
-    name: item.category,
-    value: item.percentage,
-    completed: item.completed,
-    total: item.total
-  }))
-
-  const colors = ["#667eea", "#764ba2", "#f093fb", "#f5576c", "#4facfe", "#00f2fe"]
-
+export function ProgressChart({ data, type = 'pie', title }: ProgressChartProps) {
   return (
-    <div className="h-80 w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={pieData}
-            cx="50%"
-            cy="50%"
-            labelLine={false}
-            label={({ name, value }) => `${name}: ${value}%`}
-            outerRadius={100}
-            innerRadius={40}
-            fill="#8884d8"
-            dataKey="value"
-            stroke="#fff"
-            strokeWidth={2}
-          >
-            {pieData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-            ))}
-          </Pie>
-          <Tooltip 
-            formatter={(value: number) => [`${value}%`, "Progress"]}
-            contentStyle={{
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              border: 'none',
-              borderRadius: '12px',
-              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
-            }}
-          />
-          <Legend 
-            verticalAlign="bottom" 
-            height={36}
-            iconType="circle"
-            wrapperStyle={{
-              paddingTop: '20px',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
+    <Card className="p-6">
+      {title && (
+        <h3 className="text-lg font-semibold mb-4">{title}</h3>
+      )}
+      <div className="h-64">
+        <ResponsiveContainer width="100%" height="100%">
+          {type === 'pie' ? (
+            <PieChart>
+              <Pie
+                data={data}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {data.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          ) : (
+            <BarChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="value" fill="#8884d8" />
+            </BarChart>
+          )}
+        </ResponsiveContainer>
+      </div>
+    </Card>
   )
 }
 
-interface WeeklyProgressProps {
-  data: {
-    week: string
-    dsa: number
-    frontend: number
-    systemDesign: number
-  }[]
+interface StreakChartProps {
+  data: Array<{
+    date: string
+    questions: number
+    streak: number
+  }>
 }
 
-export function WeeklyProgressChart({ data }: WeeklyProgressProps) {
+export function StreakChart({ data }: StreakChartProps) {
   return (
-    <div className="h-80 w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-          <XAxis 
-            dataKey="week" 
-            tick={{ fontSize: 12, fill: '#64748b' }}
-            axisLine={{ stroke: '#e2e8f0' }}
-          />
-          <YAxis 
-            tick={{ fontSize: 12, fill: '#64748b' }}
-            axisLine={{ stroke: '#e2e8f0' }}
-          />
-          <Tooltip 
-            contentStyle={{
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              border: 'none',
-              borderRadius: '12px',
-              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
-              fontSize: '14px'
-            }}
-          />
-          <Legend 
-            wrapperStyle={{
-              paddingTop: '20px',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}
-          />
-          <Bar 
-            dataKey="dsa" 
-            fill="url(#dsaGradient)" 
-            name="DSA" 
-            radius={[4, 4, 0, 0]}
-          />
-          <Bar 
-            dataKey="frontend" 
-            fill="url(#frontendGradient)" 
-            name="Frontend" 
-            radius={[4, 4, 0, 0]}
-          />
-          <Bar 
-            dataKey="systemDesign" 
-            fill="url(#systemGradient)" 
-            name="System Design" 
-            radius={[4, 4, 0, 0]}
-          />
-          <defs>
-            <linearGradient id="dsaGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#667eea" />
-              <stop offset="100%" stopColor="#764ba2" />
-            </linearGradient>
-            <linearGradient id="frontendGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f093fb" />
-              <stop offset="100%" stopColor="#f5576c" />
-            </linearGradient>
-            <linearGradient id="systemGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#4facfe" />
-              <stop offset="100%" stopColor="#00f2fe" />
-            </linearGradient>
-          </defs>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
+    <Card className="p-6">
+      <h3 className="text-lg font-semibold mb-4">Weekly Progress</h3>
+      <div className="h-64">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="date" />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="questions" fill="#8884d8" name="Questions Solved" />
+            <Bar dataKey="streak" fill="#00C49F" name="Current Streak" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
   )
 }
-

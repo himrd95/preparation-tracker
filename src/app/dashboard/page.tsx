@@ -1,180 +1,235 @@
-"use client"
+'use client'
 
-import { useSession } from "next-auth/react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ProgressChart, WeeklyProgressChart } from "@/components/charts/progress-chart"
-import { QuoteWidget } from "@/components/layout/quote-widget"
-import { Badge } from "@/components/ui/badge"
-import { Calendar, Target, TrendingUp, Clock } from "lucide-react"
+import { useSession } from 'next-auth/react'
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { Code, Palette, Network, TrendingUp, Target, Calendar } from 'lucide-react'
+import { GlassCard, Card } from '@/components/ui/styled'
+import { ProgressChart, StreakChart } from '@/components/charts/progress-chart'
+import { DashboardSkeleton } from '@/components/ui/skeleton'
+import toast from 'react-hot-toast'
 
-// Mock data - in real app, this would come from API
-const progressData = [
-  { category: "DSA", completed: 45, total: 100, percentage: 45 },
-  { category: "Frontend", completed: 30, total: 50, percentage: 60 },
-  { category: "System Design", completed: 15, total: 40, percentage: 37.5 }
-]
+interface Question {
+  id: string
+  title: string
+  status: 'TODO' | 'IN_PROGRESS' | 'DONE'
+  [key: string]: any
+}
 
-const weeklyData = [
-  { week: "Week 1", dsa: 5, frontend: 3, systemDesign: 2 },
-  { week: "Week 2", dsa: 8, frontend: 4, systemDesign: 3 },
-  { week: "Week 3", dsa: 6, frontend: 6, systemDesign: 4 },
-  { week: "Week 4", dsa: 10, frontend: 5, systemDesign: 3 },
-]
+interface Project {
+  id: string
+  title: string
+  status: 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'ON_HOLD'
+  [key: string]: any
+}
 
-const stats = [
-  { label: "Total Problems", value: "90", icon: Target, color: "text-blue-600" },
-  { label: "Completed", value: "60", icon: TrendingUp, color: "text-green-600" },
-  { label: "Current Streak", value: "7 days", icon: Clock, color: "text-orange-600" },
-  { label: "This Week", value: "12", icon: Calendar, color: "text-purple-600" },
-]
+interface SystemDesign {
+  id: string
+  title: string
+  status: 'TODO' | 'IN_PROGRESS' | 'DONE'
+  [key: string]: any
+}
 
 export default function DashboardPage() {
   const { data: session } = useSession()
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [systemDesigns, setSystemDesigns] = useState<SystemDesign[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchDashboardData()
+  }, [])
+
+  const fetchDashboardData = async () => {
+    try {
+      const [questionsRes, projectsRes, systemDesignsRes] = await Promise.all([
+        fetch('/api/questions'),
+        fetch('/api/projects'),
+        fetch('/api/system-design')
+      ])
+
+      if (questionsRes.ok) {
+        const questionsData = await questionsRes.json()
+        setQuestions(questionsData)
+      }
+      
+      if (projectsRes.ok) {
+        const projectsData = await projectsRes.json()
+        setProjects(projectsData)
+      }
+      
+      if (systemDesignsRes.ok) {
+        const systemDesignsData = await systemDesignsRes.json()
+        setSystemDesigns(systemDesignsData)
+      }
+    } catch (error) {
+      toast.error('Failed to load dashboard data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const quickEntryCards = [
+    {
+      title: 'DSA Problems',
+      description: 'Track your data structures and algorithms progress',
+      href: '/dsa',
+      icon: Code,
+      color: 'from-blue-500 to-blue-600',
+      stats: { 
+        total: questions.length, 
+        completed: questions.filter(q => q.status === 'DONE').length 
+      }
+    },
+    {
+      title: 'Frontend',
+      description: 'Master React, Next.js, and modern web development',
+      href: '/frontend',
+      icon: Palette,
+      color: 'from-purple-500 to-purple-600',
+      stats: { 
+        total: projects.length, 
+        completed: projects.filter(p => p.status === 'COMPLETED').length 
+      }
+    },
+    {
+      title: 'System Design',
+      description: 'Practice scalable system architecture and design',
+      href: '/system-design',
+      icon: Network,
+      color: 'from-green-500 to-green-600',
+      stats: { 
+        total: systemDesigns.length, 
+        completed: systemDesigns.filter(s => s.status === 'DONE').length 
+      }
+    }
+  ]
+
+  const progressData = [
+    { 
+      name: 'DSA', 
+      value: questions.length > 0 ? Math.round((questions.filter(q => q.status === 'DONE').length / questions.length) * 100) : 0, 
+      color: '#3B82F6' 
+    },
+    { 
+      name: 'Frontend', 
+      value: projects.length > 0 ? Math.round((projects.filter(p => p.status === 'COMPLETED').length / projects.length) * 100) : 0, 
+      color: '#8B5CF6' 
+    },
+    { 
+      name: 'System Design', 
+      value: systemDesigns.length > 0 ? Math.round((systemDesigns.filter(s => s.status === 'DONE').length / systemDesigns.length) * 100) : 0, 
+      color: '#10B981' 
+    }
+  ]
+
+  const weeklyData = [
+    { date: 'Mon', questions: 0, streak: 0 },
+    { date: 'Tue', questions: 0, streak: 0 },
+    { date: 'Wed', questions: 0, streak: 0 },
+    { date: 'Thu', questions: 0, streak: 0 },
+    { date: 'Fri', questions: 0, streak: 0 },
+    { date: 'Sat', questions: 0, streak: 0 },
+    { date: 'Sun', questions: 0, streak: 0 }
+  ]
+
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good morning'
+    if (hour < 18) return 'Good afternoon'
+    return 'Good evening'
+  }
+
+  if (loading) {
+    return <DashboardSkeleton />
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      <div className="space-y-10">
-        {/* Modern Header */}
-        <div className="relative overflow-hidden rounded-2xl">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 opacity-90"></div>
-          <div className="absolute inset-0 bg-black bg-opacity-10"></div>
-          <div className="relative glass-card p-10">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-2 tracking-tight">
-                  Welcome back, {session?.user?.name || "User"}! 👋
-                </h1>
-                <p className="text-base md:text-lg text-white/90">
-                  Ready to continue your preparation journey?
-                </p>
-              </div>
-              <div className="hidden lg:block">
-                <div className="w-32 h-32 bg-white bg-opacity-20 rounded-full flex items-center justify-center animate-float">
-                  <div className="text-6xl">🚀</div>
-                </div>
-              </div>
-            </div>
-          </div>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">
+            {getGreeting()}, {session?.user?.name || 'there'}! 👋
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Ready to level up your SDE2 preparation? Let's track your progress.
+          </p>
         </div>
-
-        {/* Modern Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => (
-            <div 
-              key={stat.label} 
-              className="group relative overflow-hidden glass-card rounded-2xl p-6 hover:scale-105 transition-all duration-300 cursor-pointer"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-white from-opacity-20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.color.replace('text-', 'from-').replace('-600', '-500')} to-white to-opacity-20`}>
-                    <stat.icon className={`h-6 w-6 text-white`} />
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-600 mb-1">{stat.label}</p>
-                    <p className="text-3xl font-bold gradient-text">{stat.value}</p>
-                  </div>
-                </div>
-                <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-1000"
-                    style={{ width: `${Math.min(100, (index + 1) * 25)}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Progress Overview */}
-          <div className="lg:col-span-2">
-            <div className="glass-card rounded-2xl p-8 hover:shadow-2xl transition-all duration-300">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-2xl font-bold gradient-text mb-2">Progress Overview</h3>
-                  <p className="text-gray-600">Your preparation progress across different categories</p>
-                </div>
-                <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl">
-                  <div className="text-white text-2xl">📊</div>
-                </div>
-              </div>
-              <div className="h-80">
-                <ProgressChart data={progressData} />
-              </div>
-            </div>
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <p className="text-sm text-muted-foreground">Current Streak</p>
+            <p className="text-2xl font-bold text-primary">3 days</p>
           </div>
-
-          {/* Quote Widget */}
-          <div>
-            <QuoteWidget />
+          <div className="text-right">
+            <p className="text-sm text-muted-foreground">Total Questions</p>
+            <p className="text-2xl font-bold text-primary">{questions.length}</p>
           </div>
-        </div>
-
-        {/* Weekly Progress */}
-        <div className="glass-card rounded-2xl p-8 hover:shadow-2xl transition-all duration-300">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-2xl font-bold gradient-text mb-2">Weekly Progress</h3>
-              <p className="text-gray-600">Your activity over the past 4 weeks</p>
-            </div>
-            <div className="p-3 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl">
-              <div className="text-white text-2xl">📈</div>
-            </div>
-          </div>
-          <div className="h-80">
-            <WeeklyProgressChart data={weeklyData} />
-          </div>
-        </div>
-
-        {/* Category Breakdown */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {progressData.map((category, index) => (
-            <div 
-              key={category.category} 
-              className="group glass-card rounded-2xl p-6 hover:scale-105 transition-all duration-300 cursor-pointer"
-              style={{ animationDelay: `${index * 150}ms` }}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold gradient-text">{category.category}</h3>
-                <div className="px-3 py-1 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-bold rounded-full">
-                  {category.percentage}%
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold text-gray-600">Progress</span>
-                  <span className="text-sm font-bold text-gray-800">{category.completed}/{category.total}</span>
-                </div>
-                
-                <div className="relative">
-                  <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-1000 ease-out"
-                      style={{ width: `${category.percentage}%` }}
-                    />
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white via-opacity-20 to-transparent rounded-full h-4 animate-pulse-slow"></div>
-                </div>
-                
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">
-                    {category.total - category.completed} remaining
-                  </span>
-                  <div className="flex items-center space-x-1">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="text-green-600 font-semibold">Active</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
+
+      {/* Quick Entry Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {quickEntryCards.map((card) => (
+          <Link key={card.title} href={card.href}>
+            <GlassCard className="group cursor-pointer">
+              <div className="flex items-start gap-4">
+                <div className={`p-3 rounded-lg bg-gradient-to-r ${card.color} text-white`}>
+                  <card.icon className="h-6 w-6" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold group-hover:text-primary transition-colors">
+                    {card.title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {card.description}
+                  </p>
+                  <div className="flex items-center gap-4 mt-3">
+                    <div className="flex items-center gap-1">
+                      <Target className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        {card.stats.completed}/{card.stats.total}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        {card.stats.total > 0 ? Math.round((card.stats.completed / card.stats.total) * 100) : 0}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </GlassCard>
+          </Link>
+        ))}
+      </div>
+
+      {/* Progress Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ProgressChart 
+          data={progressData} 
+          type="pie" 
+          title="Overall Progress" 
+        />
+        <StreakChart data={weeklyData} />
+      </div>
+
+      {/* Recent Activity */}
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">Welcome to Preparation Tracker!</p>
+              <p className="text-xs text-muted-foreground">Start by adding your first question or project</p>
+            </div>
+            <span className="text-xs text-muted-foreground">Just now</span>
+          </div>
+        </div>
+      </Card>
     </div>
   )
 }
-

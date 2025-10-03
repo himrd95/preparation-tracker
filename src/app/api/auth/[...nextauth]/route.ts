@@ -1,7 +1,6 @@
-export async function GET() {
-  return new Response("Auth endpoint", { status: 200 })
-}
+import NextAuth from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
-export async function POST() {
-  return new Response("Auth endpoint", { status: 200 })
-}
+const handler = NextAuth(authOptions)
+
+export { handler as GET, handler as POST }

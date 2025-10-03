@@ -1,110 +1,230 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { QuoteWidget } from "@/components/layout/quote-widget"
-import { ProgressChart } from "@/components/charts/progress-chart"
-import { Plus, Search, Edit, Save, X } from "lucide-react"
+import { useState, useEffect } from 'react'
+import { Plus, CheckCircle, Circle, Clock, FileText, Edit3, Save } from 'lucide-react'
+import { Card, Button, Input } from '@/components/ui/styled'
+import { ProgressChart } from '@/components/charts/progress-chart'
+import { SystemDesignSkeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
+import toast from 'react-hot-toast'
 
-// Mock data
-const systemDesignQuestions = [
-  {
-    id: "1",
-    title: "Design a URL Shortener",
-    description: "Design a service like bit.ly that can shorten long URLs",
-    status: "Done",
-    expertise: "Expert",
-    notes: "Key components: URL encoding, database design, caching strategy, load balancing. Used base62 encoding for short URLs."
-  },
-  {
-    id: "2",
-    title: "Design a Chat Application",
-    description: "Design a real-time chat application like WhatsApp",
-    status: "In Progress",
-    expertise: "Intermediate",
-    notes: "Focusing on WebSocket connections, message queuing, and real-time synchronization."
-  },
-  {
-    id: "3",
-    title: "Design a Social Media Feed",
-    description: "Design a news feed system like Facebook or Twitter",
-    status: "To Do",
-    expertise: "Beginner",
-    notes: ""
-  },
-  {
-    id: "4",
-    title: "Design a Distributed Cache",
-    description: "Design a distributed caching system like Redis",
-    status: "Done",
-    expertise: "Expert",
-    notes: "Implemented consistent hashing, cache eviction policies, and replication strategies."
-  }
-]
+interface SystemDesign {
+  id: string
+  progressId: string | null
+  title: string
+  description?: string
+  expertise: 'BEGINNER' | 'INTERMEDIATE' | 'EXPERT'
+  status: 'TODO' | 'IN_PROGRESS' | 'DONE'
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
 
-const progressData = [
-  { category: "Scalability", completed: 8, total: 12, percentage: 66.7 },
-  { category: "Distributed Systems", completed: 6, total: 10, percentage: 60 },
-  { category: "Database Design", completed: 7, total: 8, percentage: 87.5 },
-  { category: "Caching", completed: 5, total: 6, percentage: 83.3 },
-  { category: "Load Balancing", completed: 4, total: 6, percentage: 66.7 }
-]
+// Calculate progress data from actual system designs
+const getProgressData = (questions: SystemDesign[]) => {
+  const statusStats = questions.reduce((acc, design) => {
+    const status = design.status
+    if (!acc[status]) {
+      acc[status] = 0
+    }
+    acc[status]++
+    return acc
+  }, {} as Record<string, number>)
+
+  const colors = ['#10B981', '#F59E0B', '#6B7280']
+  
+  return Object.entries(statusStats).map(([status, count], index) => ({
+    name: status.replace('_', ' '),
+    value: count,
+    color: colors[index % colors.length]
+  }))
+}
+
+const getExpertiseData = (questions: SystemDesign[]) => {
+  const expertiseStats = questions.reduce((acc, design) => {
+    const expertise = design.expertise
+    if (!acc[expertise]) {
+      acc[expertise] = 0
+    }
+    acc[expertise]++
+    return acc
+  }, {} as Record<string, number>)
+
+  const colors = ['#3B82F6', '#8B5CF6', '#EF4444']
+  
+  return Object.entries(expertiseStats).map(([expertise, count], index) => ({
+    name: expertise,
+    value: count,
+    color: colors[index % colors.length]
+  }))
+}
 
 export default function SystemDesignPage() {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editingNotes, setEditingNotes] = useState("")
-  const [selectedStatus, setSelectedStatus] = useState("All")
-  const [selectedExpertise, setSelectedExpertise] = useState("All")
+  const [questions, setQuestions] = useState<SystemDesign[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null)
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [notesText, setNotesText] = useState('')
+  const [showAddForm, setShowAddForm] = useState(false)
 
-  const statuses = ["All", "To Do", "In Progress", "Done"]
-  const expertiseLevels = ["All", "Beginner", "Intermediate", "Expert"]
+  // Fetch system designs from API
+  useEffect(() => {
+    fetchSystemDesigns()
+  }, [])
 
-  const filteredQuestions = systemDesignQuestions.filter(question => {
-    const matchesSearch = question.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         question.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = selectedStatus === "All" || question.status === selectedStatus
-    const matchesExpertise = selectedExpertise === "All" || question.expertise === selectedExpertise
-    
-    return matchesSearch && matchesStatus && matchesExpertise
-  })
+  const fetchSystemDesigns = async () => {
+    try {
+      console.log('🔍 Fetching system designs from API...')
+      const response = await fetch('/api/system-design')
+      console.log('📡 API Response status:', response.status)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('📊 System designs received:', data.length)
+        console.log('📋 Sample system design:', data[0])
+        setQuestions(data)
+      } else {
+        const errorData = await response.json()
+        console.error('❌ API Error:', errorData)
+        toast.error('Failed to fetch system designs')
+      }
+    } catch (error) {
+      console.error('❌ Fetch error:', error)
+      toast.error('Error fetching system designs')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const updateSystemDesignStatus = async (systemDesignId: string, newStatus: 'TODO' | 'IN_PROGRESS' | 'DONE') => {
+    try {
+      const response = await fetch(`/api/system-design/${systemDesignId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          systemDesignId: systemDesignId,
+          status: newStatus 
+        }),
+      })
+
+      if (response.ok) {
+        const updatedSystemDesign = await response.json()
+        setQuestions(prev => 
+          prev.map(sd => sd.id === systemDesignId ? updatedSystemDesign : sd)
+        )
+        toast.success('Status updated successfully!')
+      } else {
+        const errorData = await response.json()
+        console.error('Update failed:', errorData)
+        toast.error('Failed to update status')
+      }
+    } catch (error) {
+      console.error('Update error:', error)
+      toast.error('Error updating status')
+    }
+  }
+
+  const updateSystemDesignNotes = async (systemDesignId: string, notes: string) => {
+    try {
+      const response = await fetch(`/api/system-design/${systemDesignId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          systemDesignId: systemDesignId,
+          notes: notes 
+        }),
+      })
+
+      if (response.ok) {
+        const updatedSystemDesign = await response.json()
+        setQuestions(prev => 
+          prev.map(sd => sd.id === systemDesignId ? updatedSystemDesign : sd)
+        )
+        setEditingNotes(false)
+        setSelectedQuestionId(null)
+        toast.success('Notes updated successfully!')
+      } else {
+        const errorData = await response.json()
+        console.error('Update failed:', errorData)
+        toast.error('Failed to update notes')
+      }
+    } catch (error) {
+      console.error('Update error:', error)
+      toast.error('Error updating notes')
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'DONE':
+        return <CheckCircle className="h-4 w-4 text-green-500" />
+      case 'IN_PROGRESS':
+        return <Clock className="h-4 w-4 text-yellow-500" />
+      default:
+        return <Circle className="h-4 w-4 text-muted-foreground" />
+    }
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Done": return "bg-green-100 text-green-800"
-      case "In Progress": return "bg-blue-100 text-blue-800"
-      case "To Do": return "bg-gray-100 text-gray-800"
-      default: return "bg-gray-100 text-gray-800"
+      case 'DONE':
+        return 'text-green-600 bg-green-100'
+      case 'IN_PROGRESS':
+        return 'text-yellow-600 bg-yellow-100'
+      default:
+        return 'text-muted-foreground bg-muted'
     }
   }
 
   const getExpertiseColor = (expertise: string) => {
     switch (expertise) {
-      case "Expert": return "bg-purple-100 text-purple-800"
-      case "Intermediate": return "bg-yellow-100 text-yellow-800"
-      case "Beginner": return "bg-blue-100 text-blue-800"
-      default: return "bg-gray-100 text-gray-800"
+      case 'BEGINNER':
+        return 'text-green-600 bg-green-100'
+      case 'INTERMEDIATE':
+        return 'text-yellow-600 bg-yellow-100'
+      case 'EXPERT':
+        return 'text-red-600 bg-red-100'
+      default:
+        return 'text-muted-foreground bg-muted'
     }
   }
 
-  const handleEditNotes = (question: { id: string; notes: string }) => {
-    setEditingId(question.id)
-    setEditingNotes(question.notes)
+  const getNextStatus = (currentStatus: string) => {
+    switch (currentStatus) {
+      case 'TODO':
+        return 'IN_PROGRESS'
+      case 'IN_PROGRESS':
+        return 'DONE'
+      case 'DONE':
+        return 'TODO'
+      default:
+        return 'TODO'
+    }
+  }
+
+  const handleEditNotes = (questionId: string) => {
+    const question = questions.find(q => q.id === questionId)
+    if (question) {
+      setSelectedQuestionId(questionId)
+      setNotesText(question.notes || '')
+      setEditingNotes(true)
+    }
   }
 
   const handleSaveNotes = () => {
-    // In real app, this would update the database
-    console.log("Saving notes:", editingNotes)
-    setEditingId(null)
-    setEditingNotes("")
+    if (selectedQuestionId) {
+      updateSystemDesignNotes(selectedQuestionId, notesText)
+    }
   }
 
-  const handleCancelEdit = () => {
-    setEditingId(null)
-    setEditingNotes("")
+  const selectedQuestionData = questions.find(q => q.id === selectedQuestionId)
+
+  if (loading) {
+    return <SystemDesignSkeleton />
   }
 
   return (
@@ -112,150 +232,218 @@ export default function SystemDesignPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">System Design</h1>
-          <p className="text-gray-600 mt-1">
-            Master large-scale system design and architecture
+          <h1 className="text-3xl font-bold text-foreground">System Design</h1>
+          <p className="text-muted-foreground mt-2">
+            Practice system design questions and track your architectural thinking
           </p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
+        <Button onClick={() => setShowAddForm(true)}>
+          <Plus className="h-4 w-4" />
           Add Question
         </Button>
       </div>
 
-      {/* Progress Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Design Concepts Progress</CardTitle>
-            <CardDescription>
-              Your progress across different system design concepts
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ProgressChart data={progressData} />
-          </CardContent>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="p-4">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Completed</p>
+              <p className="text-xl font-bold">{questions.filter(sd => sd.status === 'DONE').length}</p>
+            </div>
+          </div>
         </Card>
-
-        <div>
-          <QuoteWidget />
-        </div>
+        <Card className="p-4">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <Clock className="h-4 w-4 text-yellow-600" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">In Progress</p>
+              <p className="text-xl font-bold">{questions.filter(sd => sd.status === 'IN_PROGRESS').length}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-muted rounded-lg">
+              <Circle className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">To Do</p>
+              <p className="text-xl font-bold">{questions.filter(sd => sd.status === 'TODO').length}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <FileText className="h-4 w-4 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Total Questions</p>
+              <p className="text-xl font-bold">{questions.length}</p>
+            </div>
+          </div>
+        </Card>
       </div>
 
-      {/* Search and Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>System Design Questions</CardTitle>
-          <CardDescription>
-            Practice and track your system design interview preparation
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* Search and Filters */}
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search questions..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              
-              <div className="flex gap-2">
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-                >
-                  {statuses.map(status => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
-                
-                <select
-                  value={selectedExpertise}
-                  onChange={(e) => setSelectedExpertise(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-                >
-                  {expertiseLevels.map(level => (
-                    <option key={level} value={level}>{level}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Questions List */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Questions List */}
+        <div className="lg:col-span-2">
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-6">System Design Questions</h3>
             <div className="space-y-4">
-              {filteredQuestions.map((question) => (
-                <Card key={question.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
+              {questions.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No system design questions found. Try refreshing the page.</p>
+                  <Button 
+                    onClick={fetchSystemDesigns} 
+                    className="mt-4"
+                    $variant="secondary"
+                  >
+                    Refresh Questions
+                  </Button>
+                </div>
+              ) : (
+                questions.map((question) => (
+                  <div
+                    key={question.id}
+                    className={cn(
+                      'p-4 rounded-lg border border-border transition-colors cursor-pointer',
+                      selectedQuestionId === question.id 
+                        ? 'bg-accent border-primary' 
+                        : 'hover:bg-accent/50'
+                    )}
+                    onClick={() => setSelectedQuestionId(question.id)}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 mt-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            updateSystemDesignStatus(question.id, getNextStatus(question.status) as any)
+                          }}
+                          className="hover:opacity-70 transition-opacity"
+                          title={`Click to change status from ${question.status} to ${getNextStatus(question.status)}`}
+                        >
+                          {getStatusIcon(question.status)}
+                        </button>
+                      </div>
                       <div className="flex-1">
-                        <CardTitle className="text-lg">{question.title}</CardTitle>
-                        <CardDescription className="mt-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="font-medium text-foreground">
+                            {question.title}
+                          </h4>
+                          <span className={cn(
+                            'px-2 py-1 rounded-full text-xs font-medium',
+                            getStatusColor(question.status)
+                          )}>
+                            {question.status.replace('_', ' ')}
+                          </span>
+                          <span className={cn(
+                            'px-2 py-1 rounded-full text-xs font-medium',
+                            getExpertiseColor(question.expertise)
+                          )}>
+                            {question.expertise}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">
                           {question.description}
-                        </CardDescription>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge className={getStatusColor(question.status)}>
-                          {question.status}
-                        </Badge>
-                        <Badge className={getExpertiseColor(question.expertise)}>
-                          {question.expertise}
-                        </Badge>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Notes:</h4>
-                        {editingId === question.id ? (
-                          <div className="space-y-2">
-                            <textarea
-                              value={editingNotes}
-                              onChange={(e) => setEditingNotes(e.target.value)}
-                              className="w-full p-3 border border-gray-300 rounded-md text-sm resize-none"
-                              rows={3}
-                              placeholder="Add your notes here..."
-                            />
-                            <div className="flex space-x-2">
-                              <Button size="sm" onClick={handleSaveNotes}>
-                                <Save className="h-4 w-4 mr-1" />
-                                Save
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={handleCancelEdit}>
-                                <X className="h-4 w-4 mr-1" />
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-start justify-between">
-                            <p className="text-sm text-gray-600 flex-1">
-                              {question.notes || "No notes added yet..."}
-                            </p>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditNotes(question)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                        </p>
+                        {question.notes && (
+                          <div className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                            <strong>Notes:</strong> {question.notes}
                           </div>
                         )}
                       </div>
+                      <Button
+                        $variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleEditNotes(question.id)
+                        }}
+                      >
+                        <Edit3 className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
+                  </div>
+                ))
+              )}
             </div>
+          </Card>
+        </div>
+
+        {/* Notes Editor */}
+        <div>
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Notes</h3>
+              {editingNotes && (
+                <Button onClick={handleSaveNotes}>
+                  <Save className="h-4 w-4" />
+                  Save
+                </Button>
+              )}
+            </div>
+            
+            {selectedQuestionData ? (
+              <div>
+                <h4 className="font-medium text-foreground mb-2">
+                  {selectedQuestionData.title}
+                </h4>
+                {editingNotes ? (
+                  <textarea
+                    value={notesText}
+                    onChange={(e) => setNotesText(e.target.value)}
+                    placeholder="Add your notes about this system design question..."
+                    className="w-full h-64 p-3 border border-border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      {selectedQuestionData.description}
+                    </p>
+                    <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded">
+                      {selectedQuestionData.notes || 'No notes yet. Click edit to add notes.'}
+                    </div>
+                    <Button
+                      $variant="ghost"
+                      onClick={() => setEditingNotes(true)}
+                      className="w-full"
+                    >
+                      <Edit3 className="h-4 w-4 mr-2" />
+                      Edit Notes
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground py-8">
+                <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Select a question to view and edit notes</p>
+              </div>
+            )}
+          </Card>
+
+          {/* Progress Charts */}
+          <div className="space-y-6 mt-6">
+            <ProgressChart 
+              data={getProgressData(questions)} 
+              type="pie" 
+              title="Status Overview" 
+            />
+            <ProgressChart 
+              data={getExpertiseData(questions)} 
+              type="pie" 
+              title="Expertise Level" 
+            />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }
